@@ -13,7 +13,7 @@ class ROCAnalysisScorer:
 
     def auc_score(self, ground_truth, predictions, **kwargs):
         fpr, tpr, _ = metrics.roc_curve(ground_truth, predictions[:, 1])
-        area = metrics.roc_auc_score(ground_truth, predictions[:, 1], **kwargs)
+        area = metrics.auc(fpr, tpr)
 
         self.rates_.append((fpr, tpr))
         self.aucs_.append(area)
@@ -39,11 +39,11 @@ class ROCAnalysisScorer:
                 name = labels[i]
             elif isinstance(labels, str):
                 name = labels
-            plt.plot(fpr, tpr, label='%s AUC = %0.2f' % (name, area))
+            plt.plot(fpr, tpr, label='%s AUC = %0.4f' % (name, area))
 
         if mean_line and len(self.rates_) > 1:
             mean_fpr, mean_tpr, area = self.mean_roc_metrics()
-            plt.plot(mean_fpr, mean_tpr, "--", label="Mean, AUC: %.2f" % area)
+            plt.plot(mean_fpr, mean_tpr, "--", label="Mean, AUC: %.4f" % area)
 
         if chance_line:
             line = np.arange(0, 1.1, 0.1)

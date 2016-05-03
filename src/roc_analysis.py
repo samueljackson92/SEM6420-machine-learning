@@ -31,19 +31,21 @@ class ROCAnalysisScorer:
         return mean_fpr, mean_tpr, area
 
     
-    def plot_roc_curve(self, title=None, labels=None, chance_line=False, mean_line=False):
-        for i, ((fpr, tpr), area) in enumerate(zip(self.rates_, self.aucs_)):
-            if labels is None:
-                name = "ROC %d" % (i+1)
-            elif isinstance(labels, list):
-                name = labels[i]
-            elif isinstance(labels, str):
-                name = labels
-            plt.plot(fpr, tpr, label='%s AUC = %0.4f' % (name, area))
+    def plot_roc_curve(self, title=None, labels=None, show_all=True, chance_line=False, mean_line=False, mean_label="Mean"):
+        
+        if show_all:
+            for i, ((fpr, tpr), area) in enumerate(zip(self.rates_, self.aucs_)):
+                if labels is None:
+                    name = "ROC %d" % (i+1)
+                elif isinstance(labels, list):
+                    name = labels[i]
+                elif isinstance(labels, str):
+                    name = labels
+                plt.plot(fpr, tpr, label='%s AUC = %0.4f' % (name, area))
 
         if mean_line and len(self.rates_) > 1:
             mean_fpr, mean_tpr, area = self.mean_roc_metrics()
-            plt.plot(mean_fpr, mean_tpr, "--", label="Mean, AUC: %.4f" % area)
+            plt.plot(mean_fpr, mean_tpr, label="%s, AUC: %.4f" % (mean_label, area))
 
         if chance_line:
             line = np.arange(0, 1.1, 0.1)

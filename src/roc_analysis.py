@@ -2,37 +2,50 @@ from sklearn import metrics
 import numpy as np
 from scipy import interp
 import matplotlib.pyplot as plt
+from scipy.stats import threshold
 
 class ROCAnalysisScorer:
     def __init__(self):
         self.rates_ = []
         self.aucs_ = []
+        self.fhalf_scores_ = []
+        self.f2scores_ = []
+        self.f1scores_ = []
 
     def __call__(self, ground_truth, predictions, **kwargs):
         return self.auc_score(ground_truth, predictions, **kwargs)
 
     def auc_score(self, ground_truth, predictions, **kwargs):
+        thresholded = threshold(predictions[:, 1], threshmin=0.5)
+        thresholded = threshold(thresholded, threshmax=0.5, newval=1.0).astype(int)
+        fhalf_score = metrics.fbeta_score(ground_truth.astype(int), thresholded, beta=0.5)
+        f2_score = metrics.fbeta_score(ground_truth.astype(int), thresholded, beta=2)
+        f1_score = metrics.fbeta_score(ground_truth.astype(int), thresholded, beta=1)
+
         fpr, tpr, _ = metrics.roc_curve(ground_truth, predictions[:, 1])
         area = metrics.auc(fpr, tpr)
 
+        self.fhalf_scores_.append(fhalf_score)
+        self.f2scores_.append(f2_score)
+        self.f1scores_.append(f1_score)
         self.rates_.append((fpr, tpr))
         self.aucs_.append(area)
         return area
-    
+
     def mean_roc_metrics(self):
         mean_tpr = 0.0
         mean_fpr = np.linspace(0, 1, 100)
 
         for fpr, tpr in self.rates_:
-            mean_tpr += interp(mean_fpr, fpr, tpr) 
+            mean_tpr += interp(mean_fpr, fpr, tpr)
 
         mean_tpr = mean_tpr / len(self.rates_)
         area =  metrics.auc(mean_fpr, mean_tpr)
         return mean_fpr, mean_tpr, area
 
-    
+
     def plot_roc_curve(self, title=None, labels=None, show_all=True, chance_line=False, mean_line=False, mean_label="Mean"):
-        
+
         if show_all:
             for i, ((fpr, tpr), area) in enumerate(zip(self.rates_, self.aucs_)):
                 if labels is None:
@@ -52,8 +65,8 @@ class ROCAnalysisScorer:
             plt.plot(line, line, "--", label="Chance")
 
         if title is None:
-            title = 'Receiver operating characteristic' 
-        
+            title = 'Receiver operating characteristic'
+
         plt.title(title)
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
@@ -62,15 +75,15 @@ class ROCAnalysisScorer:
 
 def plot_confusion_matrix(cm, title='Confusion matrix', cmap=plt.cm.Blues):
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    
+
     width, height = cm.shape
     for x in xrange(width):
         for y in xrange(height):
-            plt.annotate(str(cm[x][y]), xy=(y, x), 
+            plt.annotate(str(cm[x][y]), xy=(y, x),
                     horizontalalignment='center',
                     verticalalignment='center', size=20)
 
     plt.title(title)
     plt.colorbar()
     plt.show()
-    
+

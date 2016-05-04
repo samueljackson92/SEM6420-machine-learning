@@ -1,9 +1,19 @@
 from roc_analysis import ROCAnalysisScorer
 from sklearn import cross_validation
 from sklearn.metrics import make_scorer
-from unbalanced_dataset import SMOTE, UnderSampler
+from unbalanced_dataset import SMOTE, UnderSampler, OverSampler
 
 def cv_pipeline(model, x_data, y_data, cv=None):
+    """ Cross Validate a model pipeline
+
+    Args:
+        model: A sklearn Pipeline object to cross validate
+        x_data: Feature matrix
+        y_data: Class labels
+        cv: A predefined sklearn cross validation object
+    Returns:
+        A ROCAnalysisScorer object with the true/false positive rates and AUCs for all folds
+    """
     roc_data = ROCAnalysisScorer()
     roc_data_scorer = make_scorer(roc_data, greater_is_better=True, needs_proba=True, average='weighted')
     cross_validation.cross_val_score(model, x_data, y_data, cv=cv, scoring=roc_data_scorer)
@@ -16,19 +26,19 @@ def test_pipeline(model, x_data, y_data, x_test, y_test):
     test_result = ROCAnalysisScorer()
     test_result.auc_score(y_test, y_hat)
     return test_result
-   
+
 
 def score_pipeline(data, cv=None):
     model = data['model']
-        
+
     cv_results = None
     test_results = None
 
     x_data, y_data = data['train_data']
-    
+
     if cv is not None:
         cv_results = cv_pipeline(model, x_data, y_data, cv=cv)
-    
+
     if 'test_data' in data:
         x_test, y_test = data['test_data']
         test_results = test_pipeline(model, x_data, y_data, x_test, y_test)
@@ -47,13 +57,16 @@ def repeated_cross_fold_validation(models, n=10, k=5):
             model_name = model['name']
             if model_name not in scorers:
                 scorers[model_name] = ROCAnalysisScorer()
-             
+
             results = score_pipeline(model, cv=skf)
 
             # for each model collect the results into a single scorer.
             # note: no average is made at this stage. The results of each
             # of the k folds is collected into a single k * n list for
             # the model.
+            scorers[model_name].f1scores_ += results[0].f1scores_
+            scorers[model_name].f2scores_ += results[0].f2scores_
+            scorers[model_name].fhalf_scores_ += results[0].fhalf_scores_
             scorers[model_name].rates_ += results[0].rates_
             scorers[model_name].aucs_ += results[0].aucs_
 
@@ -62,7 +75,7 @@ def repeated_cross_fold_validation(models, n=10, k=5):
 
 def monte_carlo_validation(x_data, y_data, models, splitter, n=10):
     scorers = {}
-    
+
     for i in range(n):
         x_train, y_train, x_valid, y_valid = splitter.split(x_data, y_data)
 
@@ -70,7 +83,7 @@ def monte_carlo_validation(x_data, y_data, models, splitter, n=10):
             model_name = model['name']
             if model_name not in scorers:
                 scorers[model_name] = ROCAnalysisScorer()
-            
+
             model['train_data'] = (x_train, y_train)
             model['test_data'] = (x_valid, y_valid)
 
@@ -80,6 +93,9 @@ def monte_carlo_validation(x_data, y_data, models, splitter, n=10):
             # note: no average is made at this stage. The results of each
             # of the k folds is collected into a single k * n list for
             # the model.
+            scorers[model_name].f1scores_ += results[1].f1scores_
+            scorers[model_name].f2scores_ += results[1].f2scores_
+            scorers[model_name].fhalf_scores_ += results[1].fhalf_scores_
             scorers[model_name].rates_ += results[1].rates_
             scorers[model_name].aucs_ += results[1].aucs_
 
@@ -107,6 +123,19 @@ class SMOTESplitter(TestSplitter):
     def split(self, x_data, y_data):
         Xt, Yt, Xv, Yv = super(SMOTESplitter, self).split(x_data, y_data)
         Xt_smote, Yt_smote = SMOTE(**self._smote_params).fit_transform(Xt.as_matrix(), Yt.as_matrix())
+        Xt_smote, Yt_smote = UnderSampler(ratio=self._under_sample).fit_transform(Xt_smote, Yt_smote)
+        return Xt_smote, Yt_smote, Xv, Yv
+
+class OverUnderSplitter(TestSplitter):
+
+    def __init__(self, under_sample=1.0, over_sample=1.0, **kwargs):
+        super(OverUnderSplitter, self).__init__(**kwargs)
+        self._under_sample = under_sample
+        self._over_sample = over_sample
+
+    def split(self, x_data, y_data):
+        Xt, Yt, Xv, Yv = super(OverUnderSplitter, self).split(x_data, y_data)
+        Xt_smote, Yt_smote = OverSampler(ratio=self._over_sample).fit_transform(Xt.as_matrix(), Yt.as_matrix())
         Xt_smote, Yt_smote = UnderSampler(ratio=self._under_sample).fit_transform(Xt_smote, Yt_smote)
         return Xt_smote, Yt_smote, Xv, Yv
 

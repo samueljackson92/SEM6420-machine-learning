@@ -393,7 +393,7 @@
 %
 % paper title
 % can use linebreaks \\ within to get better formatting as desired
-\title{Predicting the Likelihood of Survival from Thoracic Surgery Data}
+\title{Ensemble Methods for Predicting the Likelihood of Survival from Thoracic Surgery Data}
 %
 %
 % author names and IEEE memberships
@@ -502,9 +502,11 @@ The format of the result of this paper is structured as follows: section \ref{se
 \section{Methods}
 \label{sec:methods}
 
-\subsection{Dataset}
+\subsection{Dataset and Preprocessing}
 \label{subsec:dataset}
 The thoracic surgery dataset used consists of 16 predictors and 300 instances. Table \ref{table:dataset-columns} gives a description of each predictor derived from the original UCI dataset repository \cite{uic2016thoracic}. The dataset includes a mixture of both categorical (nominal and ordinal) and continuous data. The final (17$^{th}$) column of the dataset is the binary class label with value 0 if the patient survived and 1 if they died within one year of surgery.
+
+Several initial observations can be made about dataset prior to any preprocessing steps. One key thing to note about the dataset as a whole is that there is a slight imbalance between the two classes. Only 28\% of the dataset is of the positive class (28\% of patients died). While this imbalance is not extreme, it can have repercussions for the performance of the classifiers. The accuracy paradox \cite{bishop2006pattern} states that a classifier with high accuracy can be built from highly imbalanced training by always predicting the negative class.
 
 \begin{table}[]
 \centering
@@ -516,7 +518,7 @@ The thoracic surgery dataset used consists of 16 predictors and 300 instances. T
 DGN             & Nominal       & Diagnosis: Specific combination of ICD-10 codes for primary and secondary as well multiple tumours if any (DGN3, DGN2, DGN4, DGN6, DGN5, DGN8, DGN1) \\ \hline
 PRE4            & Numeric       & Forced vital capacity (FVC)                                                                                                                    \\ \hline
 PRE5            & Numeric       & Volume that has been exhaled at the end of the first second of forced expiration (FEV1)                                                        \\ \hline
-PRE6            & Ordinal       & Performance status - Zubrod scale (PRZ2,PRZ1,PRZ0)                                                                                             \\ \hline
+PRE6            & Ordinal       & Performance status - Zubrod scale (PRZ2, PRZ1, PRZ0)                                                                                             \\ \hline
 PRE7            & Nominal       & Pain before surgery (T,F)                                                                                                                      \\ \hline
 PRE8            & Nominal       & Haemoptysis before surgery (T,F)                                                                                                               \\ \hline
 PRE9            & Nominal       & Dyspnoea before surgery (T,F)                                                                                                                  \\ \hline
@@ -532,8 +534,94 @@ Risk1Y          & Nominal       & 1 year survival period - (T)rue value if died 
 \end{tabular}
 \end{table}
 
+The predictor PRE32 is zero for all of the patients in the training dataset. This predictor therefore has zero variation and will not help to discriminate between instance. PRE32 is therefore discarded during preprocessing. 
+
+PRE5 appears to have some extreme values. PRE5 corresponds to the FEV1 measure. This would suggest that some patients have an unusually high forced expiration volume. Also, all of the outliers are of the same class. This could cause the classifiers to fit to noise rather than to properly generalise. These instances were therefore removed from the dataset. No reduction in performance was witnessed during cross validation for all classifiers after their removal.
+
+The feature DGN is a nominal categorical predicator. This feature was transformed into series of new features via one hot encoding. Each new predictor is a binary feature which is one if the patient falls into the category and zero otherwise. The original DGN feature is drop after the 7 new binary features are created.
+
+\subsection{Classifiers}
+\label{subsec:classifiers}
+Four classifiers were chosen for use on the dataset. The four classifiers used are Random Forests, Gradient Boosting, AdaBoost, and Extra Trees. The implementations of all four classifiers are taken directly from the scikit-learn library \cite{pedregosa2011scikit}. All of these methods are known as ensemble methods. Ensemble methods compose together multiple weak learners a single strong classifier.
+
+\subsection{Hyperparameters \& Tuning}
+\label{subsec:tuning}
+
 \section{Results}
 \label{sec:results}
+
+\subsection{Performance Evaluation}
+\label{subsec:performance}
+
+Each classifier in section \ref{subsec:classifiers} was trained using stratified 5-fold cross validation. Stratification was performed to ensure that there was a representative sample of positive classes in each fold. For all classifiers cross validation was repeated ten times, each with a new set of folds to ensure consistent results.
+
+Figure \ref{fig:roc-cv} shows the mean ROC curve and mean AUC for each of the classifier after cross validation. The performance of each classifier appears to be very similar. Notably the ROC curve for each type of classifier is shifted to the right of the graph, suggesting that they all exhibit a low recall rate.
+
+Table \ref{table:f-scores} and figure \ref{fig:f2-score} confirm this indication. Table \ref{table:f-scores} shows the F measure with a $\beta$ parameter of 1, 2, and 0.5. Figure \ref{fig:f2-score} shows a bar chart of the F2 scores in table \ref{table:f-scores}. The performance of all classifiers measured with the F2 score (which weights recall more highly than precision) is much lower in comparison to the F0.5 and F1 scores. This further confirms that all classifiers have a problem with recall.
+
+\begin{table}
+\caption{Mean F1, F2 and F0.5 scores for all four classifiers over 10 rounds of 5-fold cross validation.}
+\label{table:f-scores}
+\begin{tabular}{lrrrr}
+{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\ 
+\hline
+F1   &      0.557502 &    0.643371 &       0.582411 &  0.617863 \\
+F2   &      0.478619 &    0.589029 &       0.515569 &  0.562853 \\
+F0.5 &      0.681112 &    0.715311 &       0.676343 &  0.689950 \\
+\end{tabular}
+\label{table:f-score-smote}
+\end{table}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/roc_cv.png}
+\caption{Mean ROC curves and the mean AUC for all four classifiers over 10 rounds of 5-fold cross validation. All four classifiers perform similarly, with Extra Trees producing the best AUC. All four curves are slightly skewed towards the right of the plot, suggestive of poor recall. The F2 score (table \ref{table:f-scores} and figure \ref{fig:f2-score} confirms this.}
+\label{fig:roc-cv}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/f2_score.png}
+\caption{Bar chart showing the F2 score for all classifiers taken from table \ref{table:f-scores}. ExtraTrees and AdaBoost are shown to perform the best. Random forests are shown to be less sensitive to recall.}
+\label{fig:f2-score}
+\end{figure}
+
+\subsection{Engineered Features}
+In addition to the preprocessing steps outlined in \ref{subsec:dataset} several combinations of new features were generated from the existing predictors. Firstly, as a large portion of the features are binary, a set of new features were created based on logical binary operators. The creation of the binary features is as follows: all pairs of binary features are enumerated. From each pair three new features are created by combining the pair using logical OR, AND and XOR.
+
+The second modification to the original dataset is to create a couple of new features called FER and OBS. FER is the FEV1/FVC ratio which is spirometry measurement defined as $(FEV1/FVC) \cdot 100$ \cite{patient2016spirometry}. It is interpreted as the percentage of FVC expelled in the first second of a forced expiration. A ratio value below <70\% can be suggestive of an obstructive disease. Using this information another feature (OBS) is generated from the ratio. OBS is a binary feature with value 1 when a patient has a ratio <70\%.
+
+Finally, a selection of new features are created from all order 2 polynomial combinations of the two best (numerical) predictors: PRE4 and PRE5. This means that the new features are of the form $a^2$, $ab$, $b^2$ where $a$ and $b$ are PRE4 and PRE5 respectively. This polynomial combination led to the best predictive results across all classifiers under cross validation.
+
+
+\subsection{Dataset Balancing}
+\label{subsec:dataset-balancing}
+As mentioned in section \ref{subsec:dataset} the thoracic surgery dataset is class imbalanced with only 28\% of the dataset being of the positive class. One technique to combat class imbalance is to resample the dataset to put more emphasis on the known positive examples. A popular technique for resampling data is SMOTE \cite{chawla2002smote}. SMOTE rebalances a dataset by creating new synthetic training to balance out the majority class. SMOTE is typically combined with under-sampling of the majority class to produce a final dataset that is re-weighted in favour of the minority class. 
+
+The results for the classifiers in part \ref{subsec:performance} shows that they have lower recall than precision. Rebalancing the dataset should show a decrease in precision and an increase in recall rate. This can be desirable in a dataset such as this where recall may be more important than precision. It is probably more desirable overestimate the number people who are likely to die from surgery than to achieve better precision.
+
+SMOTE datasets cannot be validated using conventional k-fold cross validation. This is because the testing fold would contain synthetically generated training examples which are obviously not representative of the ground truth. Instead, in order to achieve a representative sample of performance, ``Monte Carlo'' cross-validation \cite{dubitzky2007fundamentals} is used. Before a any resampling is applied, the data set is randomly split into a training and testing set. The split is stratified according to the class labels. All reported experiments use and 80/20 split. Resampling is then applied to the training dataset only, with the testing set remaining untouched. This process is then repeated for the desired number of iterations and the resulting performance measures are averaged. In all experiments the number of iterations performed was 50.  
+
+Figure \ref{fig:roc-smote} shows ROC curve and mean AUC scores for each of the classifiers using SMOTE with a resampling ratio of 0.8. Table \ref{table:f-score-smote} shows the F1, F2, and F0.5 scores for each of the classifiers. Comparing this table to the results of \ref{table:f-scores} shows a clear difference in the F2 score. Recall weighted performance is now better both than F1 and F0.5. This improvement comes at the cost of a decrease in both the AUC and F0.5 measures. Increasing the oversampling ratio or under-sampling the majority class accentuates this effect.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/roc_smote.png}
+\caption{ROC curves for all four classifiers with SMOTE oversampling with a ratio of 0.8. Each curve represents the average over 50 iterations of Monte Carlo validation. The ROC curves for all classifiers are less skewed compared to figure \ref{fig:roc-cv}.}
+\label{fig:roc-smote}
+\end{figure}
+
+\begin{table}
+\caption{Mean F1, F2 and F0.5 scores for all classifiers after monte carlo cross validation with SMOTE resampling with a ratio of 0.8}
+\begin{tabular}{lrrrr}
+{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
+\hline
+F1   &      0.603586 &    0.624919 &       0.617296 &  0.601894 \\
+F2   &      0.620932 &    0.663461 &       0.647674 &  0.636108 \\
+F0.5 &      0.590391 &    0.593262 &       0.592385 &  0.574231 \\
+\end{tabular}
+\label{table:f-score-smote}
+\end{table}
 
 \section{Discussion}
 \label{sec:discussion}

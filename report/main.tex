@@ -393,7 +393,7 @@
 %
 % paper title
 % can use linebreaks \\ within to get better formatting as desired
-\title{Ensemble Methods for Predicting the Likelihood of Survival from Thoracic Surgery Data}
+\title{Tree Based Ensembles for Predicting Survival from Thoracic Surgery}
 %
 %
 % author names and IEEE memberships
@@ -540,12 +540,78 @@ PRE5 appears to have some extreme values. PRE5 corresponds to the FEV1 measure. 
 
 The feature DGN is a nominal categorical predicator. This feature was transformed into series of new features via one hot encoding. Each new predictor is a binary feature which is one if the patient falls into the category and zero otherwise. The original DGN feature is drop after the 7 new binary features are created.
 
+Finally, after all preprocessing is complete, a random forest is trained on the dataset (with default parameters) and the resulting variable importance measure is computed. Any features with a variable importance of zero are dropped. The variable importance of the preprocessed features (before any are dropped) is shown in figure \ref{fig:feature-importance}.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/feature_importance.png}
+\caption{Feature importance for all of the features after preprocessing.}
+\label{fig:feature-importance}
+\end{figure}
+
 \subsection{Classifiers}
 \label{subsec:classifiers}
-Four classifiers were chosen for use on the dataset. The four classifiers used are Random Forests, Gradient Boosting, AdaBoost, and Extra Trees. The implementations of all four classifiers are taken directly from the scikit-learn library \cite{pedregosa2011scikit}. All of these methods are known as ensemble methods. Ensemble methods compose together multiple weak learners a single strong classifier.
+Four classifiers were chosen for use on the dataset. The four classifiers used are Random Forests, Gradient Boosting, AdaBoost, and Extra Trees. The implementations of all four classifiers are taken directly from the scikit-learn library \cite{pedregosa2011scikit}. All of these methods are known as ensemble methods. Ensemble methods compose together multiple weak learners to produce a single strong classifier. In this paper, all of the algorithms used are also tree based (although this is not necessarily the case with Gradient Boosting and AdaBoost). This means that for each classifier the base learner is a decision tree.
+
+Random forests \cite{breiman2001random} are perhaps the simplest method of the four. Random forests are simply a collection of $n$ decision trees which are individually trained on the data. The ``random'' in the name comes from the fact that each tree is trained on both a random sample of the dataset (tree bagging) and also on a random subset of the features (feature bagging). The decision tree weak learners typically overfit to the data. However because the results all trees are averaged over the resulting classification the overall variance in the final model is significantly reduced. The random element for both training instances and features is used to prevent many highly correlated trees from occurring which should reduce overfitting. 
+
+Extremely Randomized trees \cite{geurts2006extremely} (also called Extra Trees) takes the randomisation aspect of random forests one step further. Both bagging and random features are used, but additionally a random split for each feature in the subset of features is chosen instead of the just computing the optimal feature and split combination.
+
+The AdaBoost algorithm \cite{freund1997decision} is a generalised method from combining the performance of many weak learners. AdaBoost stands for ``adaptive boosting'' and boosting is a core component in the training stage. AdaBoost works by first fitting a weak learner to the training dataset and classifying each instance. The error in the classification can be used to re-weight each example in the dataset. This means that misclassified samples are then more likely to be classified correctly in future iterations. Likewise, instances that are correctly classifier can be weighted much lower, as they are easier to correctly identify. Thus AdaBoost can be seen as an additive method in that each tree is built on the error of the previous one. Adaboost does not necessarily have to be used with decision trees, but in this paper we only consider decision tree based AdaBoost.
+
+Gradient Boosting Machines \cite{natekin2013gradient} also use a boosting based approach to learning. Like AdaBoost they are an additive method that iteratively fits a collection of weak learners. Where the two differ is in the way that instances are ``weighted''. The weighting function in AdaBoost can be seen as a special type of loss function. The gradient of a differentiable loss function can be use to steer the search towards the optimum decision function. In gradient boosting machines the new function added to the mix is the one which is the closest to parallel with the negative gradient of the observed data.
+
+These algorithms were chosen to showcase a broad range of different ensemble algorithms. Ensemble methods often outperform a single strong learner due to the diversity present in the model. All of the models are also decision tree based which work well with a mixture of continuous and discrete values like those present in our dataset. 
+
+Two common techniques used in training ensemble algorithms are bagging and boosting. This paper compares two algorithms based on boosting (AdaBoost and Gradient Boosting) and two based on bagging (Random Forests and Extra Trees). These seem like good candidates based on the dataset for two reasons: 1) bagging can be used address the imbalance in the dataset by equally resampling each of the datasets and 2) there doesn't seem to be a clear separation between classes in the dataset which potentially makes boosting a good technique as it should help to push the algorithm towards classify the difficult examples it's it misses.
 
 \subsection{Hyperparameters \& Tuning}
 \label{subsec:tuning}
+
+Before all experiments were carried out on the dataset, the hyper-parameters of each classifier were tuned to hopefully achieve optimum performance. The values and number hyper-parameters are dependant both on the implementation of the classifier and the dataset itself. If there is more than one hyper-parameter for a classifier (as is the case with all classifiers used here) then ideally combinations of all hyper-parameters should be explored. Sadly, this means that the space of potential hyper-parameters explodes with the number of hyper-parameters increases.
+
+Due to the relatively small size of the dataset, the space of potential parameters for each classifier is explored using a grid search. In a grid search, all a selection of hyper-parameter values are explicitly enumerated. Each potential value for a hyper-parameter is tested in combination with every other hyper-parameter value. The speed of the grid search is bearable due to the classifier being relatively quick to train on this small dataset. The performance of a set of parameters was evaluated using stratified $k$-fold cross validation with ROC AUC as the scoring metric.
+
+For Random Forests a grid search was performed over the tree parameters \textit{max\_depth}, \textit{max\_features}, \textit{min\_samples\_split} and \textit{min\_samples\_leaf}. \textit{max\_depth} and \textit{max\_features} were trained over the range 2 - 20 in steps of 3. \textit{min\_samples\_split} and \textit{min\_samples\_leaf} were trained over all values in the range 1 - 5. The number of trees used was fixed to 50 during this search. This is because a small number of trees will be quick to train (and hence the search will complete faster). Generally speaking the performance of the forest should improve as the number of trees increases, so this can be trained afterwards.
+
+The results of tuning the tree parameters showed that \textit{min\_samples\_split} and \textit{min\_samples\_leaf} should be set to 1. This seems logical due to the small number of positive samples. \textit{max\_depth}, \textit{max\_features} were optimised as 16 and 5 respectively. These seem reasonable given the low number of predictive features and the fact that trees in random forests should typically overfit (hence the large maximum depth). After this trial another grid search was performed to find the optimum number of trees over the range 50 - 500 in steps of 50. This suggested that 100 trees should be used. 
+
+The training procedure for Extremely Random Trees was identical to Random Forests with the results being similar. After tuning 200 trees were used and \textit{max\_features} was set to 16 and \textit{max\_depth} set to 19.
+
+Adaboost was tuned by fixing the maximum depth of the decision tree and performing a grid search over the number of trees (50 - 1000 in steps of 50) and the learning rate (with values 0.1, 0.5, 0.01, and 0.005) together. This was repeated for multiple values of the maximum depth (tested with values 2, 4, and 6). After tuning 400 trees were used with a \textit{learning\_rate} of 0.5 and \textit{max\_depth} of 4.
+
+Gradient Boosting has many parameters that need to be explored, many of which can interact with one another and tuning in the wrong order can lead to poor results. The number of parameters can also be awkward to train due to the speed of training. The tuning procedure for gradient boosting was therefore as follows:
+
+\begin{itemize}
+	\item Fix all of the parameters to be reasonable initial guesses and fix the learning rate to be quite high (0.1).
+	\item Find the optimum number of estimators for the given leaning rate (searched over the range 20 - 150 in steps of 10).
+	\item Tune the tree based parameters \textit{max\_depth} and \textit{min\_samples\_split} (searched over the ranges 5-16 in steps of 2 and 1-20 in steps of 3 respectively).
+	\item Tune \textit{max\_features} (5-20 in steps of 2)
+	\item Tune the subsample ratio (values: 0.6, 0.7, 0.75, 0.8, 0.85, and 0.9).
+	\item Finally using all previously tuned parameters increase the number of estimators while simultaneously decreasing the learning rate.
+\end{itemize}
+
+The final values for the tuned parameters used are shown in table \ref{table:gb-parameters}.
+
+\begin{table}
+\centering
+\caption{Tuned Parameters for the Gradient Boosting Classifier}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter}                &       \textbf{Value}    \\
+\hline
+learning\_rate            &      0.01 \\ \hline
+max\_depth                &         9 \\ \hline
+max\_features             &        11 \\ \hline
+min\_samples\_leaf         &         1 \\ \hline
+min\_samples\_split        &         7 \\ \hline
+n\_estimators             &      1000 \\ \hline
+subsample                &       0.8 \\ \hline
+\end{tabular}
+\label{table:gb-parameters}
+
+\end{table}
+
 
 \section{Results}
 \label{sec:results}
@@ -563,13 +629,13 @@ Table \ref{table:f-scores} and figure \ref{fig:f2-score} confirm this indication
 \caption{Mean F1, F2 and F0.5 scores for all four classifiers over 10 rounds of 5-fold cross validation.}
 \label{table:f-scores}
 \begin{tabular}{lrrrr}
-{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\ 
+{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.557502 &    0.643371 &       0.582411 &  0.617863 \\
-F2   &      0.478619 &    0.589029 &       0.515569 &  0.562853 \\
-F0.5 &      0.681112 &    0.715311 &       0.676343 &  0.689950 \\
+F1   &      0.601006 &    0.606542 &       0.623161 &  0.607031 \\
+F2   &      0.522676 &    0.546392 &       0.567522 &  0.549125 \\
+F0.5 &      0.715848 &    0.688120 &       0.700784 &  0.683489 \\
 \end{tabular}
-\label{table:f-score-smote}
+
 \end{table}
 
 \begin{figure}[!t]
@@ -582,17 +648,95 @@ F0.5 &      0.681112 &    0.715311 &       0.676343 &  0.689950 \\
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.5\textwidth]{../src/img/f2_score.png}
-\caption{Bar chart showing the F2 score for all classifiers taken from table \ref{table:f-scores}. ExtraTrees and AdaBoost are shown to perform the best. Random forests are shown to be less sensitive to recall.}
+\caption{Bar chart showing the F2 score for all classifiers taken from table \ref{table:f-scores}.}
 \label{fig:f2-score}
 \end{figure}
 
-\subsection{Engineered Features}
+\subsection{Feature Engineering}
 In addition to the preprocessing steps outlined in \ref{subsec:dataset} several combinations of new features were generated from the existing predictors. Firstly, as a large portion of the features are binary, a set of new features were created based on logical binary operators. The creation of the binary features is as follows: all pairs of binary features are enumerated. From each pair three new features are created by combining the pair using logical OR, AND and XOR.
+
+Figure \ref{fig:roc-binary-features} shows the ROC curves for the same dataset but with the additional binary features. appended. Table \ref{table:f-scores-binary} shows the corresponding F-scores for each classifier. From these results it is easy to see that all of the classifiers appear to perform worse with the new features. This may be due to their already limited contribution and that fact that the additional dimensionality is hindering progress.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/roc_binary_features.png}
+\caption{ROC curves for each of the classifiers with the additional binary features. Performance is notably worse compared to the initial run.}
+\label{fig:roc-binary-features}
+\end{figure}
+
+
+\begin{table}
+\caption{F scores for the dataset including binary features}
+\begin{tabular}{lrrrr}
+{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
+\hline
+F1   &      0.543811 &    0.560718 &       0.612539 &  0.646753 \\
+F2   &      0.465938 &    0.489906 &       0.547107 &  0.591129 \\
+F0.5 &      0.662682 &    0.660713 &       0.705097 &  0.721499 \\
+\end{tabular}
+\label{table:f-scores-binary}	
+\end{table}
+
 
 The second modification to the original dataset is to create a couple of new features called FER and OBS. FER is the FEV1/FVC ratio which is spirometry measurement defined as $(FEV1/FVC) \cdot 100$ \cite{patient2016spirometry}. It is interpreted as the percentage of FVC expelled in the first second of a forced expiration. A ratio value below <70\% can be suggestive of an obstructive disease. Using this information another feature (OBS) is generated from the ratio. OBS is a binary feature with value 1 when a patient has a ratio <70\%.
 
-Finally, a selection of new features are created from all order 2 polynomial combinations of the two best (numerical) predictors: PRE4 and PRE5. This means that the new features are of the form $a^2$, $ab$, $b^2$ where $a$ and $b$ are PRE4 and PRE5 respectively. This polynomial combination led to the best predictive results across all classifiers under cross validation.
+From figure \ref{fig:roc-spiro-features} it can be seen that their is a slight improvement over the original ROC AUC scores using these additional spirometry features. This is backed up by plotting the feature importance obtained from training a random forest on the dataset (see \ref{fig:feature-importance}). The two new features, particularly the FER feature are providing useful training information. This seems sensible as the new features are just combinations of existing well performing features.
 
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/roc_spiro_features.png}
+\caption{ROC curves for each of the classifiers with the spirometry features.}
+\label{fig:roc-spiro-features}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/importance_spiro_features.png}
+\caption{Variable importance for each of the features with the spirometry features included.}
+\label{fig:importance-spiro-features}
+\end{figure}
+
+\begin{table}
+\caption{F scores for the dataset including spirometry features}
+\begin{tabular}{lrrrr}
+{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
+\hline
+F1   &      0.566669 &    0.617225 &       0.600845 &  0.614050 \\
+F2   &      0.483774 &    0.549281 &       0.538619 &  0.561441 \\
+F0.5 &      0.699297 &    0.715047 &       0.688793 &  0.683218 \\
+\end{tabular}
+\end{table}
+
+Motivated by the results of the previous test, a selection of new features were created from all order 2 polynomial combinations of the two best predictors: PRE4 and PRE5. This means that the new features are of the form $a^2$, $ab$, $b^2$ where $a$ and $b$ are PRE4 and PRE5 respectively. 
+
+This polynomial combination led to the best in the feature engineering results across all classifiers under cross validation. Figure \ref{fig:roc-poly-features} shows the ROC curves with the additional features included. The F-scores for each classifier are show in table \ref{table:f-scores-poly}. The contribution of the new features can be seen in the variable importance plot (figure \ref{fig:importance-poly-features}).
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/roc_poly_features.png}
+\caption{ROC curves for each of the classifiers with the polynomial combination features.}
+\label{fig:roc-poly-features}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.5\textwidth]{../src/img/importance_poly_features.png}
+\caption{Variable importance for each of the features with the polynomial combination features included.}
+\label{fig:importance-poly-features}
+\end{figure}
+
+\begin{table}
+\caption{F scores for the dataset including polynomial combination features}
+\begin{tabular}{lrrrr}
+{} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
+\hline
+F1   &      0.604371 &    0.634325 &       0.615442 &  0.662434 \\
+F2   &      0.517592 &    0.563459 &       0.560582 &  0.613066 \\
+F0.5 &      0.736327 &    0.732681 &       0.690843 &  0.726515 \\
+\end{tabular}
+
+\label{table:f-scores-poly}	
+\end{table}
 
 \subsection{Dataset Balancing}
 \label{subsec:dataset-balancing}
@@ -616,19 +760,37 @@ Figure \ref{fig:roc-smote} shows ROC curve and mean AUC scores for each of the c
 \begin{tabular}{lrrrr}
 {} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.603586 &    0.624919 &       0.617296 &  0.601894 \\
-F2   &      0.620932 &    0.663461 &       0.647674 &  0.636108 \\
-F0.5 &      0.590391 &    0.593262 &       0.592385 &  0.574231 \\
+F1   &      0.614570 &    0.613840 &       0.615768 &  0.611035 \\
+F2   &      0.648492 &    0.650097 &       0.648949 &  0.643250 \\
+F0.5 &      0.587619 &    0.585145 &       0.589706 &  0.586983 \\
 \end{tabular}
 \label{table:f-score-smote}
 \end{table}
 
 \section{Discussion}
 \label{sec:discussion}
+The experiments in section \ref{sec:results} have shown a variety of different approaches to predicting surgery survival with ensemble methods. Some of the best performance was achieved using the just the basic preprocessing steps outlined in section \ref{subsec:dataset}.
+
+Looking at the initial performance evaluation (figure \ref{fig:roc-cv}) it can be seen that all classifiers performed reasonable similarly with Gradient Boosting narrowly coming out ahead. The weakest performer was AdaBoost. Looking at the F-scores for each of the classifiers (table \ref{table:f-scores}) is more informative. All classifiers can be seen to perform comparable. Each performed weaker under the F2 measure which weights recall more highly than precision. It is the higher recall rate which is primarily driving the improvement of Gradient Boosting over the other classifiers in this trial.
+
+Motivated by this baseline evaluation, this paper explored alternative feature representations through ``feature engineering''. The first attempt was to create combinations of binary features from the existing dataset. This actually lead to worse results compared to the original preprocessing steps. None of the new binary features significantly contributed new information for the algorithm to work with. This probably meant that the increase in dimensionality out weighed any small gains delivered by the new representation. Each tree in the ensembles will only look at a limited number of features, so adding lots of redundant features is only likely to decrease performance while increasing training time. Note that an attempt was made to reduce the number of features by discarding the $n$ weakest features using both variable importance and PCA, but neither method improved the results of this test.
+
+The second feature engineering experiment was to a couple of features generated from spirometry theory. Both the FER and OBS feature suggested are directly derived from the existing predictors in the dataset. The bar chart in figure \ref{fig:importance-spiro-features} shows that these features do appear to contribute some additional information for the classifiers to work with. This is reflected in the AUC scores and the corresponding F-scores. The result for AUC is nearly identical between Gradient Boosting, Extra-Trees, and Random forests. The most successful (by a tiny margin) showed that Random forests performed the best in terms in AUC but this was only due to high precision. The F2 and F1 score are both much reduced in in the Random Forest trial. With these new features the best candidate appears to be Extra-Trees which has an improvement across all three F-scores.
+
+The third experiment involving feature engineering was to create a new batch of features by creating polynomial combinations of the features PRE4 and PRE5 which were shown to be the strongest predictors in figure \ref{fig:feature-importance}. This lead to the best AUC scores out of all the trails with three out of the four classifiers pushing into the 0.9 range. The variable importance plot (\ref{fig:importance-poly-features}) shows that many of the polynomial features are the most successful contributors. The F-scores reflect this result and show higher scores across the board. By far the biggest increase was in terms of precision. In particular, AdaBoost faired much better with polynomial features.
+
+Finally an experiment was carried looking at improving the performance by resampling the dataset using SMOTE. While random forests and extra-trees already carry out bagging which already balances the dataset during training, this method could of potentially helped the performance of the boosting classifiers. Figure \ref{fig:roc-smote} shows a marked decrease in performance across all classifiers. This is probably due to the synthetic examples not realistically reflecting the distribution of positive examples in the dataset. What is more interesting is the fact that the F2 scores for each classifier are improved by applying SMOTE but the precision is dramatically hindered. This is could be due to the synthetic examples ``expanding'' the region around positive examples which the algorithm considers to be positive. This is probably not representative of the true decision boundary, but has the effect of increasing recall as more examples are likely to land with the expanded positive region. While this test resulted in much worse performance it could still be of interest. In predicting thoracic surgery survival it is more desirable to have high recall than high precision.
+
 
 \section{Conclusions}
 \label{sec:conclusions}
+In conclusion this paper examined the effect of four different ensemble methods on a variety of engineered features. The effect of resampling the dataset was also explored. The final classifier used on the unused testing data for submission was trained using both the additional polynomial and spirometry features. This lead to best performance with the {} classifier. This classifier had a final AUC after cross validation of {}.
 
+While this is one of the best AUC scores achieved across all experiments there is clearly some room from improvement. One area of improvement worth exploring would be to look at more automated methods of feature selection. One such method could be recursive feature elimination in conjunction with a model that estimates feature relevance (such as random forests). Alternatively a non-linear dimensionality reduction technique could be used to find projections of the feature space onto a lower dimensional embedding. This could be particular beneficial in the case of the binary features where the feature space is relatively much larger. 
+
+Another avenue for exploration would be to look at a different branch of algorithms. For example a penalised SVM could be experimented with. The original authors of \cite{zikeba2014boosted} propose a boosted SVM which performs reasonable well on the expanded dataset. Any alternative classifier will probably benefit from some from of bagging or resampling more than the ensemble methods.
+
+The experiments in this paper show that any further predictive progress appears to be hindered by the low recall rate. This is a common trade-off in machine learning. Implementing this system in the real world would most likely require favouring a lower F0.5 score for a higher F2 for safety reasons. Any progress beyond the AUC achieved in this paper is likely to require a combination of further creative feature engineering and a good mix of bagging/resampling.
 
 
 % needed in second column of first page if using \IEEEpubid

@@ -68,6 +68,43 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage[T1]{fontenc}
+\usepackage{csvsimple}
+
+
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+
+\lstset{ %
+  backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  captionpos=b,                    % sets the caption-position to bottom
+  commentstyle=\color{mygreen},    % comment style
+  deletekeywords={...},            % if you want to delete keywords from the given language
+  escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+  extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+  frame=single,	                   % adds a frame around the code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  keywordstyle=\color{blue},       % keyword style
+  language=Octave,                 % the language of the code
+  otherkeywords={*,...},           % if you want to add more keywords to the set
+  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+  numbersep=5pt,                   % how far the line-numbers are from the code
+  numberstyle=\tiny\color{mygray}, % the style that is used for the line-numbers
+  rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+  showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  showstringspaces=false,          % underline spaces within strings only
+  showtabs=false,                  % show tabs within strings adding particular underscores
+  stepnumber=1,                    % the step between two line-numbers. If it's 1, each line will be numbered
+  stringstyle=\color{mymauve},     % string literal style
+  tabsize=2,	                   % sets default tabsize to 2 spaces
+  title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
 
 % Some very useful LaTeX packages include:
 % (uncomment the ones you want to load)
@@ -385,9 +422,7 @@
 
 % correct bad hyphenation here
 \hyphenation{op-tical net-works semi-conduc-tor}
-
-
-
+    
 
 \begin{document}
 %
@@ -489,10 +524,6 @@
 % For peerreview papers, this IEEEtran command inserts a page break and
 % creates the second title. It will be ignored for other modes.
 \IEEEpeerreviewmaketitle
-
-\begin{abstract}
-	Abstract goes here...
-\end{abstract}
 
 \section{Introduction}
 Thoracic surgery is a major invasive surgery involving operating on the lungs of a patient. The authors of ref. \cite{zikeba2014boosted} collected several pieces of possibly relevant data on a number patients who went on to have thoracic surgery. The data also includes a record of whether a given patient survived for longer than one year after the surgery. This paper looks at using a reduced subset of the features and patients from the dataset in \cite{zikeba2014boosted} to classify patients based on whether or not they will survive for one year after the surgery. This paper compares three different classifiers: random forests \cite{breiman2001random}, extremely randomised trees \cite{geurts2006extremely}, and gradient boosting \cite{natekin2013gradient}. 
@@ -792,6 +823,8 @@ Another avenue for exploration would be to look at a different branch of algorit
 
 The experiments in this paper show that any further predictive progress appears to be hindered by the low recall rate. This is a common trade-off in machine learning. Implementing this system in the real world would most likely require favouring a lower F0.5 score for a higher F2 for safety reasons. Any progress beyond the AUC achieved in this paper is likely to require a combination of further creative feature engineering and a good mix of bagging/resampling.
 
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 
 % needed in second column of first page if using \IEEEpubid
 %\IEEEpubidadjcol
@@ -898,11 +931,54 @@ The experiments in this paper show that any further predictive progress appears 
 % starts a section numbered zero.)
 %
 
-
+\clearpage
+\onecolumn
 \appendices
-\section{IPython Notebook and Additional Python Files}
 
-\section{Predictions for Testing Dataset}
+\section{Third Party Libraries}
+The code use to produce the results in the paper rely upon a number of different third party libraries. The libraries used and the relevant version of each is show in the table below. lease note that the \textit{UnbalancedData} library is not currently directly available through \textit{pip} by default and so must be installed directly from the GitHub repository using the following command:
+
+\begin{lstlisting}
+	pip install git+https://github.com/fmfn/UnbalancedDataset
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Third party libraries and the accompanying versions used in all the following code samples.}
+\label{my-label}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Name}     & \textbf{Version} \\ \hline
+pandas            & 0.18.0           \\ \hline
+sklearn           & 0.17.1           \\ \hline
+UnbalancedDataset & 0.1              \\ \hline
+matplotlib        & 1.5.1            \\ \hline
+numpy             & 1.11.0           \\ \hline
+scipy             & 0.17.0           \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Python Script for Final Classifier}
+\label{appendix:final-classifier}
+This appendix contains the python script for creating the final classifier used to make the predictions on the test dataset for this assignment. This will save a CSV file in the data folder called \textit{submission.csv}.
+
+\lstinputlisting[language=Python]{../src/classify.py}
+
+\section{IPython Notebook and Additional Python Modules for Analysis, Training and Tuning}
+This listing shows the contents of the analysis IPython notebook as a python script. For a better formatted version of this code install IPython and open the Analysis.ipynb file provided with the assignment submission. This IPython notebook contains all of the code for analysing the data, tuning the algorithms, and performing both stratified k-fold and Mote Carlo cross validation. Two additional modules (\textit{pipeline} and \textit{roc\_analysis}) are also provided as listing as the end of this section.
+
+\lstinputlisting[language=Python]{../src/analysis.py}
+
+\subsection{ROC Analysis Module}
+\lstinputlisting[language=Python]{../src/roc_analysis.py}
+
+\subsection{Pipeline Module}
+\lstinputlisting[language=Python]{../src/pipeline.py}
+
+\section{Final Predictions}
+This listing shows the final submission CSV file generated from the code in \ref{appendix:final-classifier}.  
+
+\lstinputlisting[language=Python]{../data/submission.csv}
 
 
 % use section* for acknowledgement
@@ -942,8 +1018,7 @@ The experiments in this paper show that any further predictive progress appears 
 % <OR> manually copy in the resultant .bbl file
 % set second argument of \begin to the number of references
 % (used to reserve space for the reference number labels box)
-\bibliographystyle{IEEEtran}
-\bibliography{references}
+
 %\begin{thebibliography}{1}
 %
 %\bibitem{IEEEhowto:kopka}

@@ -91,10 +91,11 @@ gbc_params = {
     'n_estimators': 1000,
     'learning_rate': 0.01
 }
-gbc = GradientBoostingClassifier(**gbc_params)
-gbc_pipe = Pipeline([('scaler', scaler), ('GradientBoostingClassifer', gbc)])
 
-model = {'name': 'GradientBoost', 'model': gbc_pipe}
+gbc = GradientBoostingClassifier(**gbc_params)
+gbc_pipe = Pipeline([('scaler', scaler), ('GradientBoostingClassifier', gbc)])
+
+model = {'name': 'GradientBoosting', 'model': gbc_pipe}
 
 # Create training features
 spiro_features = create_spiro_features(Xp)
@@ -111,15 +112,10 @@ test_poly_features = create_poly_features(Xtest, ['PRE4', 'PRE5'])
 Xtest = pd.concat([Xtest, test_spiro_features, test_poly_features], axis=1)
 
 # Build model
-gbc_final = model['model']
-gbc_final.fit(Xp_all, Yp)
-predicted_prob = pd.Series(gbc_final.predict_proba(Xtest)[:, 0])
-
-# Format output
-predicted_label = predicted_prob.copy()
-predicted_label[predicted_label >= 0.5] = 1
-predicted_label[predicted_label < 0.5] = 0
-predicted_label = predicted_label.astype(int)
+final_model = model['model']
+final_model.fit(Xp_all, Yp)
+predicted_prob = pd.Series(final_model.predict_proba(Xtest)[:, 1])
+predicted_label = pd.Series(final_model.predict(Xtest))
 
 final_submission = pd.concat([test.test_id, predicted_label, predicted_prob], axis=1)
 final_submission.columns = ['test_id', 'predicted_label', 'predicted_output']

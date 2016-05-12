@@ -1,17 +1,24 @@
 
 # coding: utf-8
 
-# In[1536]:
+# In[1]:
 
 get_ipython().magic(u'matplotlib inline')
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC
+from sklearn.ensemble import ExtraTreesClassifier, AdaBoostClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+import pipeline
+from roc_analysis import ROCAnalysisScorer
 
 
 # ### Loading the Datasets
 
-# In[2556]:
+# In[197]:
 
 df = pd.DataFrame.from_csv("../data/train_risk.csv", index_col=False)
 test = pd.DataFrame.from_csv("../data/test_risk.csv", index_col=False)
@@ -19,10 +26,10 @@ X, y = df[df.columns[:-1]], df[df.columns[-1]]
 
 
 # ## Analysing the Data
-# 
+#
 # Looking at the difference between the number of positive and negative samples in the dataset shows that there are more negative examples than positive examples. Only 28% of all samples are of the positive class.
 
-# In[428]:
+# In[3]:
 
 def class_balance_summary(y):
     """ Summarise the imbalance in the dataset"""
@@ -46,14 +53,14 @@ class_balance_summary(y)
 #  - DGN looks catagorical. As above.
 #  - PRE5 looks to have some outliers. See box plot below. Potentially remove or split into two extra variable?
 
-# In[2391]:
+# In[4]:
 
 X.head()
 
 
 # Box plot below shows the outliers in PRE5. It is worth noting that all of these outliers are of the negative class. This variable is the volume that can be exhaled in one second given full inhilation. It is likely that these values are therefore errors in reporting as it is unlikely that humans can exhale such a large volume so quickly.
 
-# In[3501]:
+# In[5]:
 
 # X.PRE5.plot(kind='box')
 X.PRE5.plot(kind='box')
@@ -61,10 +68,10 @@ print y[X.PRE5 > 30 ]
 
 
 # ## Preprocessing
-# 
-# Create a new matrix of preprocessed features. This will encode catagorical data as one hot vectors, remove outliers, and normalise the data.  
+#
+# Create a new matrix of preprocessed features. This will encode catagorical data as one hot vectors, remove outliers, and normalise the data.
 
-# In[4081]:
+# In[198]:
 
 from sklearn import preprocessing
 
@@ -74,7 +81,7 @@ def encode_onehot(x_data, column_name, digitize=False):
 
     if digitize:
         data = np.digitize(data, np.arange(data.min(), data.max(), 10))
-    
+
     enc = preprocessing.OneHotEncoder()
     features = enc.fit_transform(data).toarray()
     names = ['%s_%d' % (column_name, i) for i in enc.active_features_]
@@ -85,16 +92,16 @@ def encode_onehot(x_data, column_name, digitize=False):
 def preprocess(x_data, y_data=None):
     # drop zero var PRE32
     Xp = x_data.drop("PRE32", axis=1)
-    
+
     # remove outliers
-    if y_data is not None: 
+    if y_data is not None:
         mask = Xp.PRE5 < 30
         Xp = Xp.loc[mask]
         Yp = y_data.copy()
         Yp = Yp.loc[mask]
     else:
         Yp = None
-    
+
     # encode catagorical data as one hot vectors
     one_hot_names = ["DGN"]
     encoded = map(lambda name: encode_onehot(Xp, name), one_hot_names)
@@ -114,11 +121,14 @@ Xp.head()
 
 # Measure the effectiveness of each feature using the variable importance measure from a Random Forest
 
-# In[4043]:
+# In[10]:
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 
 def measure_importance(x_data, y_data):
     rf_selector = RandomForestClassifier(criterion='gini', class_weight='balanced')
-    rf_selector.fit(scaler.fit_transform(x_data), y_data)
+    rf_selector.fit(StandardScaler().fit_transform(x_data), y_data)
     feature_importance = pd.Series(rf_selector.feature_importances_, index=x_data.columns).sort_values(ascending=False)
     feature_importance.plot(kind='bar')
     return feature_importance
@@ -127,7 +137,7 @@ feature_importance = measure_importance(Xp, Yp)
 Xp.drop(feature_importance[feature_importance == 0].index, inplace=True, axis=1)
 
 
-# In[3967]:
+# In[11]:
 
 feature_importance.plot(kind='barh')
 plt.xlabel('Gini Impurity')
@@ -137,16 +147,16 @@ plt.savefig("img/feature_importance.png")
 
 # The numerical features appear to be the most important ones. Plot a scatter plot matrix to see how the how the correlate with each other
 
-# In[3757]:
+# In[12]:
 
 pd.tools.plotting.scatter_matrix(Xp[['PRE4', 'PRE5', 'AGE']], c=Yp)
 
 
 # ## Tuning Model Parameters
-# 
+#
 # Given the current status of the data tune the model parameters to it before we evalute the overall performance. Note that all of the tuning presented here is orientated towards obtaining the highest AUC score. Other metrics might be more desirable given the problem domain, but AUC is the measurement used for assignment points.
 
-# In[3532]:
+# In[13]:
 
 from sklearn import cross_validation
 skf = cross_validation.StratifiedKFold(Yp, n_folds=5)
@@ -200,7 +210,7 @@ rf_clf2.best_estimator_.get_params()
 
 
 # ### Gradient Boosting Tuning
-# 
+#
 # Gradient boosting is difficult to tune effectively. [This guide](http://www.analyticsvidhya.com/blog/2016/02/complete-guide-parameter-tuning-gradient-boosting-gbm-python/) suggests starting by fixing the learning rate and number of estimators to a relatively low number in order to tune the other hyperparameters. After they are optimised the learning rate is gradually lowered and the number of estimators increased until we find convergance on the optimum parameters
 
 # In[3587]:
@@ -228,10 +238,10 @@ print gbc_clf.best_params_
 
 # In[3594]:
 
-const_params = {'n_estimators':100, 
-                'learning_rate': 0.1, 
-                'min_samples_leaf': 3, 
-                'max_features': 'sqrt', 
+const_params = {'n_estimators':100,
+                'learning_rate': 0.1,
+                'min_samples_leaf': 3,
+                'max_features': 'sqrt',
                 'subsample': 0.8
                }
 
@@ -255,9 +265,9 @@ gbc_clf.grid_scores_
 
 # In[3600]:
 
-const_params = {'n_estimators':100, 
-                'learning_rate': 0.1, 
-                'min_samples_leaf': 3, 
+const_params = {'n_estimators':100,
+                'learning_rate': 0.1,
+                'min_samples_leaf': 3,
                 'max_features': 'sqrt',
                 'max_depth': 9,
                 'min_samples_split': 7,
@@ -284,9 +294,9 @@ print gbc_clf.best_params_
 
 # In[3603]:
 
-const_params = {'n_estimators':100, 
-                'learning_rate': 0.1, 
-                'min_samples_leaf': 3, 
+const_params = {'n_estimators':100,
+                'learning_rate': 0.1,
+                'min_samples_leaf': 3,
                 'max_features': 'sqrt',
                 'max_depth': 9,
                 'min_samples_split': 7,
@@ -314,11 +324,11 @@ print gbc_clf.best_params_
 
 # In[3614]:
 
-const_params = { 
-                'min_samples_leaf': 1, 
-                'min_samples_split': 7, 
-                'max_depth': 9, 
-                'max_features': 11, 
+const_params = {
+                'min_samples_leaf': 1,
+                'min_samples_split': 7,
+                'max_depth': 9,
+                'max_features': 11,
                 'subsample': 0.8
                }
 
@@ -369,7 +379,7 @@ adb_clf.grid_scores_
 
 
 # ### Extremely Random Trees Tuning
-# 
+#
 # This is very similar to Random Forests. In fact we will start with the same parameter set for the grid search.
 
 # In[3800]:
@@ -415,19 +425,9 @@ etc_clf2.best_estimator_.get_params()
 
 
 # ## Model Performance
-# Test the performance of each of the models on the preprocessed dataset before trying any more complicated feature engineering/resampling. This should give us some rough baseline AUC measures to work with. Firstly, set up the models. This creates a set of pipelines for each of the models we want to use. 
+# Test the performance of each of the models on the preprocessed dataset before trying any more complicated feature engineering/resampling. This should give us some rough baseline AUC measures to work with. Firstly, set up the models. This creates a set of pipelines for each of the models we want to use.
 
-# In[3971]:
-
-from sklearn.pipeline import Pipeline
-from sklearn.svm import SVC
-from sklearn.ensemble import ExtraTreesClassifier, AdaBoostClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-reload(pipeline)
-import pipeline
-reload(roc_analysis)
-from roc_analysis import ROCAnalysisScorer
+# In[178]:
 
 scaler = preprocessing.StandardScaler()
 
@@ -436,11 +436,11 @@ knn = KNeighborsClassifier(n_neighbors=5, weights='distance')
 dct = DecisionTreeClassifier(class_weight='balanced', max_depth=4)
 abt = AdaBoostClassifier(dct, n_estimators=400, learning_rate=0.5)
 
-gbc_params = { 
-    'min_samples_leaf': 1, 
-    'min_samples_split': 7, 
-    'max_depth': 9, 
-    'max_features': 11, 
+gbc_params = {
+    'min_samples_leaf': 1,
+    'min_samples_split': 7,
+    'max_depth': 9,
+    'max_features': 11,
     'subsample': 0.8,
     'n_estimators': 1000,
     'learning_rate': 0.01
@@ -448,7 +448,7 @@ gbc_params = {
 gbc = GradientBoostingClassifier(**gbc_params)
 
 exf_params = {
-    'bootstrap': True,
+    'bootstrap': False,
     'class_weight': 'balanced',
     'criterion': 'gini',
     'max_depth': 19,
@@ -504,7 +504,7 @@ for model in models:
 
 # Define some useful helper functions for summarising the results of k-fold/monte carlo cross validation
 
-# In[3829]:
+# In[150]:
 
 def f_score_summary(scorers):
     """ Create a summary of the average f-scores for all folds/trials"""
@@ -515,8 +515,8 @@ def f_score_summary(scorers):
         s = pd.Series(f_scores, index=['F1', 'F2', 'F0.5'])
         series.append(s)
         columns.append(key)
-    
-    frame = pd.concat(series, axis = 1)    
+
+    frame = pd.concat(series, axis = 1)
     frame.columns = columns
     return frame
 
@@ -530,26 +530,25 @@ def summarise_scorers(scorers):
 
 # Perform n iterations of k fold cross validation. Here I am using 10 iterations and 5 folds at each iteration.
 
-# In[3972]:
+# In[151]:
 
 scorers = pipeline.repeated_cross_fold_validation(models, n=10, k=5)
 
 
 # Plot an ROC curve and the mean AUCs.
 
-# In[3973]:
+# In[153]:
 
-get_ipython().magic(u'matplotlib inline')
 for key, scorer in scorers.iteritems():
     scorer.plot_roc_curve(mean_label=key, mean_line=True, show_all=False)
 
 plt.plot(np.arange(0,1.1, 0.1), np.arange(0,1.1, 0.1), '--')
-# plt.savefig("img/roc_cv.png")
+plt.savefig("img/roc_cv.png")
 
 
 # Plot bar chart of the F2 scores
 
-# In[3862]:
+# In[154]:
 
 f_scores = f_score_summary(scorers)
 ax = f_scores.loc['F2'].plot(kind='barh', title='F2 Measure for All Classifiers', color=['b', 'r', 'g', 'y'])
@@ -560,7 +559,7 @@ plt.savefig('img/f2_score.png')
 
 # Summarise the F scores
 
-# In[3833]:
+# In[155]:
 
 f_scores = f_score_summary(scorers)
 print f_scores.to_latex()
@@ -568,12 +567,12 @@ f_scores
 
 
 # ## Feature Engineering
-# 
+#
 # Test creating some new features based on combinations of existing ones in the dataset. Cross validate each set of new features to see if it improves performance.
 
 # ### Binary Features
 
-# In[3917]:
+# In[156]:
 
 import itertools
 
@@ -585,7 +584,7 @@ def binary_combinations(x_data, names):
         features.append(np.logical_xor(a, b).astype(int))
         features.append(np.logical_and(a, b).astype(int))
         features.append(np.logical_or(a, b).astype(int))
-        
+
     return pd.DataFrame(np.array(features).T, index=x_data.index)
 
 binary_features = binary_combinations(Xp, ['PRE7', 'PRE8', 'PRE9', 'PRE10', 'PRE11', 'PRE17', 'PRE30'])
@@ -594,15 +593,15 @@ feature_importance = measure_importance(Xp_binary, Yp)
 Xp_binary.drop(feature_importance[feature_importance == 0].index, inplace=True, axis=1)
 
 
-# In[3879]:
+# In[157]:
 
 for model in models:
     model['train_data'] = (Xp_binary, Yp)
-    
+
 scorers = pipeline.repeated_cross_fold_validation(models, n=10, k=5)
 
 
-# In[3881]:
+# In[158]:
 
 get_ipython().magic(u'matplotlib inline')
 for key, scorer in scorers.iteritems():
@@ -612,7 +611,7 @@ plt.plot(np.arange(0,1.1, 0.1), np.arange(0,1.1, 0.1), '--')
 plt.savefig("img/roc_binary_features.png")
 
 
-# In[3882]:
+# In[159]:
 
 f_scores = f_score_summary(scorers)
 print f_scores.to_latex()
@@ -621,7 +620,7 @@ f_scores
 
 # ### Spirometry Based Features
 
-# In[4031]:
+# In[160]:
 
 def create_spiro_features(x_data):
     # create new feature FER
@@ -635,13 +634,13 @@ def create_spiro_features(x_data):
     OBS = pd.Series(np.zeros(x_data.AGE.shape))
     OBS.index = x_data.index
     OBS.loc[FER < 70] = 1.0
-    
+
     spiro = pd.concat([FER, OBS], axis=1)
     spiro.columns = ['FER', 'OBS']
     return spiro
 
 
-# In[4032]:
+# In[161]:
 
 spiro_features = create_spiro_features(Xp)
 Xp_spiro = pd.concat([Xp, spiro_features], axis=1)
@@ -649,15 +648,15 @@ feature_importance = measure_importance(Xp_spiro, Yp)
 Xp_spiro.drop(feature_importance[feature_importance == 0].index, inplace=True, axis=1)
 
 
-# In[3954]:
+# In[162]:
 
 for model in models:
     model['train_data'] = (Xp_spiro, Yp)
-    
+
 scorers = pipeline.repeated_cross_fold_validation(models, n=10, k=5)
 
 
-# In[3955]:
+# In[163]:
 
 get_ipython().magic(u'matplotlib inline')
 for key, scorer in scorers.iteritems():
@@ -667,7 +666,7 @@ plt.plot(np.arange(0,1.1, 0.1), np.arange(0,1.1, 0.1), '--')
 plt.savefig("img/roc_spiro_features.png")
 
 
-# In[3957]:
+# In[164]:
 
 feature_importance.plot(kind='barh')
 plt.xlabel('Gini Impurity')
@@ -675,7 +674,7 @@ plt.tight_layout()
 plt.savefig("img/importance_spiro_features.png")
 
 
-# In[3958]:
+# In[165]:
 
 f_scores = f_score_summary(scorers)
 print f_scores.to_latex()
@@ -684,11 +683,11 @@ f_scores
 
 # ### Polynomial Combinations
 
-# In[3959]:
+# In[166]:
 
 def create_poly_features(x_data, names):
     # create new features base on Polynomials of the original best two predictors
-    poly = sklearn.preprocessing.PolynomialFeatures(2, include_bias=False, interaction_only=True)
+    poly = preprocessing.PolynomialFeatures(2, include_bias=False, interaction_only=True)
     poly_features = pd.DataFrame(poly.fit_transform(x_data[names]), index=x_data.index)
     poly_features.columns = ["POLY_%d" % i for i in poly_features.columns]
     return poly_features
@@ -699,15 +698,15 @@ feature_importance = measure_importance(Xp_poly, Yp)
 Xp_poly.drop(feature_importance[feature_importance == 0].index, inplace=True, axis=1)
 
 
-# In[3960]:
+# In[167]:
 
 for model in models:
     model['train_data'] = (Xp_poly, Yp)
-    
+
 scorers = pipeline.repeated_cross_fold_validation(models, n=10, k=5)
 
 
-# In[3961]:
+# In[168]:
 
 get_ipython().magic(u'matplotlib inline')
 for key, scorer in scorers.iteritems():
@@ -717,7 +716,7 @@ plt.plot(np.arange(0,1.1, 0.1), np.arange(0,1.1, 0.1), '--')
 plt.savefig("img/roc_poly_features.png")
 
 
-# In[3962]:
+# In[169]:
 
 feature_importance.plot(kind='barh')
 plt.xlabel('Gini Impurity')
@@ -725,7 +724,7 @@ plt.tight_layout()
 plt.savefig("img/importance_poly_features.png")
 
 
-# In[3964]:
+# In[170]:
 
 f_scores = f_score_summary(scorers)
 print f_scores.to_latex()
@@ -733,52 +732,52 @@ f_scores
 
 
 # ## Resampling the Dataset
-# 
+#
 # Testing whether using resampling improves performance
 
 # ### Testing with regular Over/Under sampling
 
-# In[3906]:
+# In[43]:
 
 splitter = pipeline.OverUnderSplitter(test_size=0.2, under_sample=0.4, over_sample=0.8)
 overunder_scorers = pipeline.monte_carlo_validation(Xp, Yp, models, splitter, n=50)
 
 
-# In[3822]:
+# In[45]:
 
 for key, scorer in overunder_scorers.iteritems():
     scorer.plot_roc_curve(mean_label=key, mean_line=True, show_all=False)
 
 
-# In[3823]:
+# In[46]:
 
 f_score_summary(overunder_scorers)
 
 
-# In[3824]:
+# In[48]:
 
-summarise_scorers(smote_scorers)
+summarise_scorers(overunder_scorers)
 
 
 # ### Testing with SMOTE + Undersampling
 
-# In[3907]:
+# In[171]:
 
 smote_params = {'kind': 'regular', 'k':3, 'ratio': 0.8, 'verbose': 1}
 splitter = pipeline.SMOTESplitter(test_size=0.2, under_sample=1.0, smote_params=smote_params)
 smote_scorers = pipeline.monte_carlo_validation(Xp, Yp, models, splitter, n=50)
 
 
-# In[3910]:
+# In[172]:
 
 for key, scorer in smote_scorers.iteritems():
     scorer.plot_roc_curve(mean_label=key, mean_line=True, show_all=False)
-    
+
 plt.plot(np.arange(0,1.1, 0.1), np.arange(0,1.1, 0.1), '--')
 plt.savefig("img/roc_smote.png")
 
 
-# In[3911]:
+# In[173]:
 
 smote_f_scores = f_score_summary(smote_scorers)
 print smote_f_scores.to_latex()
@@ -787,7 +786,7 @@ smote_f_scores
 
 # ## Best Classifier
 
-# In[4060]:
+# In[199]:
 
 spiro_features = create_spiro_features(Xp)
 poly_features = create_poly_features(Xp, ['PRE4', 'PRE5'])
@@ -796,53 +795,55 @@ Xp_all.drop(['DGN_1', 'DGN_8'], axis=1, inplace=True)
 for model in models:
     model['train_data'] = (Xp_all, Yp)
 
+
+# In[200]:
+
 scorers = pipeline.repeated_cross_fold_validation(models, n=10, k=5)
 
 
-# In[4061]:
+# In[201]:
 
 for key, scorer in scorers.iteritems():
     scorer.plot_roc_curve(mean_label=key, mean_line=True, show_all=False)
-    
+
 plt.plot(np.arange(0,1.1, 0.1), np.arange(0,1.1, 0.1), '--')
 
 
-# In[3981]:
+# In[202]:
 
 f_scores = f_score_summary(scorers)
 f_scores
 
 
 # ## Predicton on Test Set
-# 
+#
 # Finally, based on the best combination of techniques used in the preceeding sections, and using the classifier with the best AUC performance, make probalistic predictions based on the unlabelled test data.
 
-# In[4083]:
+# In[207]:
 
 Xtest, _ = preprocess(test, y_data=None)
-Xtest = Xtest.drop('test_id', axis=1)
+Xtest = Xtest.drop(['test_id'], axis=1)
 
 test_spiro_features = create_spiro_features(Xtest)
 test_poly_features = create_poly_features(Xtest, ['PRE4', 'PRE5'])
 Xtest = pd.concat([Xtest, test_spiro_features, test_poly_features], axis=1)
 
-print Xtest.columns.size, Xp_all.columns.size
+print Xtest.columns.size
+print Xp_all.columns.size
 
 
-# In[4084]:
+# In[224]:
 
-gbc_final = models[3]['model']
-gbc_final.fit(Xp_all, Yp)
-predicted_prob = pd.Series(gbc_final.predict_proba(Xtest)[:, 0])
+final_model = models[3]['model']
+final_model.fit(Xp_all, Yp)
+predicted_prob = pd.Series(final_model.predict_proba(Xtest)[:, 1])
+predicted_label = pd.Series(final_model.predict(Xtest))
 
 
-# In[4085]:
-
-predicted_label = predicted_prob.copy()
-predicted_label[predicted_label>=0.5] = 1
-predicted_label[predicted_label<0.5] = 0
+# In[225]:
 
 final_submission = pd.concat([test.test_id, predicted_label, predicted_prob], axis=1)
 final_submission.columns = ['test_id', 'predicted_label', 'predicted_output']
+class_balance_summary(predicted_label)
 final_submission
 

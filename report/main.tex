@@ -526,9 +526,9 @@
 \IEEEpeerreviewmaketitle
 
 \section{Introduction}
-Thoracic surgery is a major invasive surgery involving operating on the lungs of a patient. The authors of ref. \cite{zikeba2014boosted} collected several pieces of possibly relevant data on a number patients who went on to have thoracic surgery. The data also includes a record of whether a given patient survived for longer than one year after the surgery. This paper looks at using a reduced subset of the features and patients from the dataset in \cite{zikeba2014boosted} to classify patients based on whether or not they will survive for one year after the surgery. This paper compares three different classifiers: random forests \cite{breiman2001random}, extremely randomised trees \cite{geurts2006extremely}, and gradient boosting \cite{natekin2013gradient}. 
+Thoracic surgery is a major invasive surgery involving operating on the lungs of a patient. The authors of ref. \cite{zikeba2014boosted} collected several pieces of possibly relevant data on a number of patients who went on to have thoracic surgery. The data also includes a record of whether a given patient survived for longer than one year after the surgery. This paper looks at using a reduced subset of the features and patients from the dataset in \cite{zikeba2014boosted} to classify patients based on whether or not they will survive for one year after the surgery. This paper compares four different classifiers: Random Forests \cite{breiman2001random}, Extremely Randomised Trees \cite{geurts2006extremely}, AdaBoost \cite{freund1997decision}, and Gradient Boosting \cite{natekin2013gradient}. 
 
-The format of the result of this paper is structured as follows: section \ref{sec:methods} outlines the preprocessing steps performed on the dataset and describes the classifiers used. Section \ref{sec:results} presents the performance of the classifiers on the dataset. Section \ref{sec:discussion} discusses the results and presents possible justification for the performance based on the properties of the classifier and dataset. Finally, a summary and discussion of possible future directions are discussed in section \ref{sec:conclusions}.
+The format of the rest of this paper is structured as follows: section \ref{sec:methods} outlines the preprocessing steps performed on the dataset and describes the classifiers used. Section \ref{sec:results} presents the performance of the classifiers on the dataset and explores different feature sets. The effects of resampling the dataset are also shown. Section \ref{sec:discussion} discusses the results and presents possible justification for the performance based on the properties of the classifier and dataset. Finally, a summary and of possible future directions are discussed in section \ref{sec:conclusions}.
 
 \section{Methods}
 \label{sec:methods}
@@ -537,7 +537,7 @@ The format of the result of this paper is structured as follows: section \ref{se
 \label{subsec:dataset}
 The thoracic surgery dataset used consists of 16 predictors and 300 instances. Table \ref{table:dataset-columns} gives a description of each predictor derived from the original UCI dataset repository \cite{uic2016thoracic}. The dataset includes a mixture of both categorical (nominal and ordinal) and continuous data. The final (17$^{th}$) column of the dataset is the binary class label with value 0 if the patient survived and 1 if they died within one year of surgery.
 
-Several initial observations can be made about dataset prior to any preprocessing steps. One key thing to note about the dataset as a whole is that there is a slight imbalance between the two classes. Only 28\% of the dataset is of the positive class (28\% of patients died). While this imbalance is not extreme, it can have repercussions for the performance of the classifiers. The accuracy paradox \cite{bishop2006pattern} states that a classifier with high accuracy can be built from highly imbalanced training by always predicting the negative class.
+Several initial observations can be made about dataset prior to any preprocessing steps. One key thing to note about the dataset as a whole is that there is a slight imbalance between the two classes. Only 28\% of the dataset is of the positive class (28\% of patients died). While this imbalance is not extreme, it can have repercussions for the performance of the classifiers. The accuracy paradox \cite{bishop2006pattern} states that a classifier with high accuracy can be built from highly imbalanced data by always predicting the negative class.
 
 \begin{table}[]
 \centering
@@ -571,39 +571,39 @@ PRE5 appears to have some extreme values. PRE5 corresponds to the FEV1 measure. 
 
 The feature DGN is a nominal categorical predicator. This feature was transformed into series of new features via one hot encoding. Each new predictor is a binary feature which is one if the patient falls into the category and zero otherwise. The original DGN feature is drop after the 7 new binary features are created.
 
-Finally, after all preprocessing is complete, a random forest is trained on the dataset (with default parameters) and the resulting variable importance measure is computed. Any features with a variable importance of zero are dropped. The variable importance of the preprocessed features (before any are dropped) is shown in figure \ref{fig:feature-importance}.
+Finally, after all preprocessing is complete, a Random Forest is trained on the dataset (with default parameters) and the resulting variable importance measure is computed. Any features with a variable importance of zero are dropped. The variable importance of the preprocessed features (before any are dropped) is shown in figure \ref{fig:feature-importance}.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.5\textwidth]{../src/img/feature_importance.png}
-\caption{Feature importance for all of the features after preprocessing.}
+\caption{Feature importance for all of the features after preprocessing. Variables with the prefix DNG\_ are the one-hot encoded versions of the original DNG variable. The numerical predictors PRE4, PRE5, and AGE are shown to be the most important to survival prediction.}
 \label{fig:feature-importance}
 \end{figure}
 
 \subsection{Classifiers}
 \label{subsec:classifiers}
-Four classifiers were chosen for use on the dataset. The four classifiers used are Random Forests, Gradient Boosting, AdaBoost, and Extra Trees. The implementations of all four classifiers are taken directly from the scikit-learn library \cite{pedregosa2011scikit}. All of these methods are known as ensemble methods. Ensemble methods compose together multiple weak learners to produce a single strong classifier. In this paper, all of the algorithms used are also tree based (although this is not necessarily the case with Gradient Boosting and AdaBoost). This means that for each classifier the base learner is a decision tree.
+Four classifiers were chosen for use on the dataset. The four classifiers used are Random Forests, Gradient Boosting, AdaBoost, and Extra Trees. The implementations of all four classifiers are taken directly from the scikit-learn library \cite{pedregosa2011scikit}. All of these methods are ensemble methods. Ensemble methods compose together multiple weak learners to produce a single strong learner. In this paper, all of the algorithms used are also tree based (although this is not necessarily the case for Gradient Boosting and AdaBoost). This means that for each classifier the base learner is a decision tree.
 
-Random forests \cite{breiman2001random} are perhaps the simplest method of the four. Random forests are simply a collection of $n$ decision trees which are individually trained on the data. The ``random'' in the name comes from the fact that each tree is trained on both a random sample of the dataset (tree bagging) and also on a random subset of the features (feature bagging). The decision tree weak learners typically overfit to the data. However because the results all trees are averaged over the resulting classification the overall variance in the final model is significantly reduced. The random element for both training instances and features is used to prevent many highly correlated trees from occurring which should reduce overfitting. 
+Random forests \cite{breiman2001random} are perhaps the simplest method of the four. Random forests are simply a collection of $n$ decision trees which are individually trained on the data. The ``random'' in the name comes from the fact that each tree is trained on both a random sample of the dataset (tree bagging) and also on a random subset of the features (feature bagging). The decision tree weak learners typically overfit to the data. However because the results of all trees are averaged over the variance in the final model's prediction is significantly reduced. The random element for both training instances and features is used to prevent many highly correlated trees from occurring and therefore reduce overfitting. 
 
-Extremely Randomized trees \cite{geurts2006extremely} (also called Extra Trees) takes the randomisation aspect of random forests one step further. Both bagging and random features are used, but additionally a random split for each feature in the subset of features is chosen instead of the just computing the optimal feature and split combination.
+Extremely Randomised trees \cite{geurts2006extremely} (also called Extra-Trees) takes the randomisation aspect of random forests one step further. Random features are still used but training data is not bootstrapped. This aims to reduce model bias. Additionally a random split for each feature in the subset of features is chosen instead of the just computing the optimal feature and split combination. This has the benefit of potentially lowering the variance in the model.
 
-The AdaBoost algorithm \cite{freund1997decision} is a generalised method from combining the performance of many weak learners. AdaBoost stands for ``adaptive boosting'' and boosting is a core component in the training stage. AdaBoost works by first fitting a weak learner to the training dataset and classifying each instance. The error in the classification can be used to re-weight each example in the dataset. This means that misclassified samples are then more likely to be classified correctly in future iterations. Likewise, instances that are correctly classifier can be weighted much lower, as they are easier to correctly identify. Thus AdaBoost can be seen as an additive method in that each tree is built on the error of the previous one. Adaboost does not necessarily have to be used with decision trees, but in this paper we only consider decision tree based AdaBoost.
+The AdaBoost algorithm \cite{freund1997decision} is a generalised method for combining the performance of many weak learners. AdaBoost stands for ``adaptive boosting'' and boosting is a core component in the training stage. AdaBoost works by first fitting a weak learner to the training dataset and classifying each instance. The error in the classification can be used to re-weight each example in the dataset. Misclassified samples are therefore more likely to be classified correctly in future iterations. Likewise, instances that are correctly classified can be weighted much lower, as they are easier to correctly identify. AdaBoost can be seen as an additive method in that each tree is built on the error of the previous one. Adaboost does not necessarily have to be used with decision trees, but in this paper only decision tree based AdaBoost is considered.
 
 Gradient Boosting Machines \cite{natekin2013gradient} also use a boosting based approach to learning. Like AdaBoost they are an additive method that iteratively fits a collection of weak learners. Where the two differ is in the way that instances are ``weighted''. The weighting function in AdaBoost can be seen as a special type of loss function. The gradient of a differentiable loss function can be use to steer the search towards the optimum decision function. In gradient boosting machines the new function added to the mix is the one which is the closest to parallel with the negative gradient of the observed data.
 
-These algorithms were chosen to showcase a broad range of different ensemble algorithms. Ensemble methods often outperform a single strong learner due to the diversity present in the model. All of the models are also decision tree based which work well with a mixture of continuous and discrete values like those present in our dataset. 
+These algorithms were chosen to showcase a broad range of different ensemble algorithms. Ensemble methods often outperform a single strong learner due to the diversity present in the model. All of the models are also decision tree based which work well with a mixture of continuous and discrete values like those present in the dataset. 
 
-Two common techniques used in training ensemble algorithms are bagging and boosting. This paper compares two algorithms based on boosting (AdaBoost and Gradient Boosting) and two based on bagging (Random Forests and Extra Trees). These seem like good candidates based on the dataset for two reasons: 1) bagging can be used address the imbalance in the dataset by equally resampling each of the datasets and 2) there doesn't seem to be a clear separation between classes in the dataset which potentially makes boosting a good technique as it should help to push the algorithm towards classify the difficult examples it's it misses.
+Two common techniques used in training ensemble algorithms are bagging and boosting. This paper compares two algorithms based on boosting (AdaBoost and Gradient Boosting) and one based on bagging (Random Forests). Extra-Trees also utilise bagging for feature subsets. These seem like good candidates based on the dataset for two reasons: 1) bagging can be used address the imbalance in the dataset by equally resampling each of the datasets and 2) there doesn't seem to be a clear separation between classes in the dataset which potentially makes boosting a good technique as it should help to push the algorithm towards classifying the difficult missed examples.
 
 \subsection{Hyperparameters \& Tuning}
 \label{subsec:tuning}
 
-Before all experiments were carried out on the dataset, the hyper-parameters of each classifier were tuned to hopefully achieve optimum performance. The values and number hyper-parameters are dependant both on the implementation of the classifier and the dataset itself. If there is more than one hyper-parameter for a classifier (as is the case with all classifiers used here) then ideally combinations of all hyper-parameters should be explored. Sadly, this means that the space of potential hyper-parameters explodes with the number of hyper-parameters increases.
+Before all experiments were carried out on the dataset, the hyper-parameters of each classifier were tuned to hopefully achieve optimum performance. The values and number hyper-parameters are dependant both on the implementation of the classifier and the dataset itself. If there is more than one hyper-parameter for a classifier (as is the case with all classifiers used here) then ideally combinations of all hyper-parameters should be explored. Sadly, this means that the space of potential hyper-parameters choices explodes as the number of hyper-parameters increases.
 
-Due to the relatively small size of the dataset, the space of potential parameters for each classifier is explored using a grid search. In a grid search, all a selection of hyper-parameter values are explicitly enumerated. Each potential value for a hyper-parameter is tested in combination with every other hyper-parameter value. The speed of the grid search is bearable due to the classifier being relatively quick to train on this small dataset. The performance of a set of parameters was evaluated using stratified $k$-fold cross validation with ROC AUC as the scoring metric.
+Due to the relatively small size of the dataset, the space of potential parameters for each classifier is explored using a grid search. In a grid search, a selection of hyper-parameter values are explicitly enumerated. Each potential value for a hyper-parameter is tested in combination with every other hyper-parameter value. The speed of the grid search is bearable due to the classifier being relatively quick to train on this small dataset. The performance of a set of parameters was evaluated using stratified $k$-fold cross validation with ROC AUC as the scoring metric.
 
-For Random Forests a grid search was performed over the tree parameters \textit{max\_depth}, \textit{max\_features}, \textit{min\_samples\_split} and \textit{min\_samples\_leaf}. \textit{max\_depth} and \textit{max\_features} were trained over the range 2 - 20 in steps of 3. \textit{min\_samples\_split} and \textit{min\_samples\_leaf} were trained over all values in the range 1 - 5. The number of trees used was fixed to 50 during this search. This is because a small number of trees will be quick to train (and hence the search will complete faster). Generally speaking the performance of the forest should improve as the number of trees increases, so this can be trained afterwards.
+For Random Forests a single grid search was performed over the tree parameters \textit{max\_depth}, \textit{max\_features}, \textit{min\_samples\_split} and \textit{min\_samples\_leaf}. \textit{max\_depth} and \textit{max\_features} were trained over the range 2 - 20 in steps of 3. \textit{min\_samples\_split} and \textit{min\_samples\_leaf} were trained over all values in the range 1 - 5. The number of trees used was fixed to 50 during this search. This is because a small number of trees will be quick to train (and hence the search will complete faster). Generally speaking the performance of the forest should improve as the number of trees increases, so this can be trained afterwards.
 
 The results of tuning the tree parameters showed that \textit{min\_samples\_split} and \textit{min\_samples\_leaf} should be set to 1. This seems logical due to the small number of positive samples. \textit{max\_depth}, \textit{max\_features} were optimised as 16 and 5 respectively. These seem reasonable given the low number of predictive features and the fact that trees in random forests should typically overfit (hence the large maximum depth). After this trial another grid search was performed to find the optimum number of trees over the range 50 - 500 in steps of 50. This suggested that 100 trees should be used. 
 
@@ -652,7 +652,7 @@ subsample                &       0.8 \\ \hline
 
 Each classifier in section \ref{subsec:classifiers} was trained using stratified 5-fold cross validation. Stratification was performed to ensure that there was a representative sample of positive classes in each fold. For all classifiers cross validation was repeated ten times, each with a new set of folds to ensure consistent results.
 
-Figure \ref{fig:roc-cv} shows the mean ROC curve and mean AUC for each of the classifier after cross validation. The performance of each classifier appears to be very similar. Notably the ROC curve for each type of classifier is shifted to the right of the graph, suggesting that they all exhibit a low recall rate.
+Figure \ref{fig:roc-cv} shows the mean ROC curve and mean AUC for each of the classifiers after cross validation. The performance of each classifier appears to be very similar. Notably the ROC curve for each type of classifier is shifted to the right of the graph, suggesting that they all exhibit a low recall rate.
 
 Table \ref{table:f-scores} and figure \ref{fig:f2-score} confirm this indication. Table \ref{table:f-scores} shows the F measure with a $\beta$ parameter of 1, 2, and 0.5. Figure \ref{fig:f2-score} shows a bar chart of the F2 scores in table \ref{table:f-scores}. The performance of all classifiers measured with the F2 score (which weights recall more highly than precision) is much lower in comparison to the F0.5 and F1 scores. This further confirms that all classifiers have a problem with recall.
 
@@ -662,9 +662,9 @@ Table \ref{table:f-scores} and figure \ref{fig:f2-score} confirm this indication
 \begin{tabular}{lrrrr}
 {} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.601006 &    0.606542 &       0.623161 &  0.607031 \\
-F2   &      0.522676 &    0.546392 &       0.567522 &  0.549125 \\
-F0.5 &      0.715848 &    0.688120 &       0.700784 &  0.683489 \\
+F1   &      0.597687 &    0.588262 &       0.624193 &  0.624870 \\
+F2   &      0.519876 &    0.539351 &       0.570319 &  0.574151 \\
+F0.5 &      0.713685 &    0.656862 &       0.698756 &  0.691422 \\
 \end{tabular}
 
 \end{table}
@@ -701,9 +701,9 @@ Figure \ref{fig:roc-binary-features} shows the ROC curves for the same dataset b
 \begin{tabular}{lrrrr}
 {} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.543811 &    0.560718 &       0.612539 &  0.646753 \\
-F2   &      0.465938 &    0.489906 &       0.547107 &  0.591129 \\
-F0.5 &      0.662682 &    0.660713 &       0.705097 &  0.721499 \\
+F1   &      0.532500 &    0.571757 &       0.611276 &  0.652767 \\
+F2   &      0.459203 &    0.517610 &       0.543585 &  0.598086 \\
+F0.5 &      0.644672 &    0.646104 &       0.707112 &  0.728810 \\
 \end{tabular}
 \label{table:f-scores-binary}	
 \end{table}
@@ -732,10 +732,11 @@ From figure \ref{fig:roc-spiro-features} it can be seen that their is a slight i
 \begin{tabular}{lrrrr}
 {} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.566669 &    0.617225 &       0.600845 &  0.614050 \\
-F2   &      0.483774 &    0.549281 &       0.538619 &  0.561441 \\
-F0.5 &      0.699297 &    0.715047 &       0.688793 &  0.683218 \\
+F1   &      0.566668 &    0.607952 &       0.601360 &  0.619702 \\
+F2   &      0.484577 &    0.562422 &       0.540406 &  0.560452 \\
+F0.5 &      0.696171 &    0.670030 &       0.687827 &  0.699803 \\
 \end{tabular}
+\label{table:f-scores-spiro}
 \end{table}
 
 Motivated by the results of the previous test, a selection of new features were created from all order 2 polynomial combinations of the two best predictors: PRE4 and PRE5. This means that the new features are of the form $a^2$, $ab$, $b^2$ where $a$ and $b$ are PRE4 and PRE5 respectively. 
@@ -758,12 +759,13 @@ This polynomial combination led to the best in the feature engineering results a
 
 \begin{table}
 \caption{F scores for the dataset including polynomial combination features}
+
 \begin{tabular}{lrrrr}
 {} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.604371 &    0.634325 &       0.615442 &  0.662434 \\
-F2   &      0.517592 &    0.563459 &       0.560582 &  0.613066 \\
-F0.5 &      0.736327 &    0.732681 &       0.690843 &  0.726515 \\
+F1   &      0.596854 &    0.586917 &       0.617784 &  0.658825 \\
+F2   &      0.508636 &    0.539122 &       0.563169 &  0.608835 \\
+F0.5 &      0.733492 &    0.653059 &       0.692061 &  0.723445 \\
 \end{tabular}
 
 \label{table:f-scores-poly}	
@@ -788,13 +790,15 @@ Figure \ref{fig:roc-smote} shows ROC curve and mean AUC scores for each of the c
 
 \begin{table}
 \caption{Mean F1, F2 and F0.5 scores for all classifiers after monte carlo cross validation with SMOTE resampling with a ratio of 0.8}
+
 \begin{tabular}{lrrrr}
 {} &  RandomForest &  ExtraTrees &  GradientBoost &  AdaBoost \\
 \hline
-F1   &      0.614570 &    0.613840 &       0.615768 &  0.611035 \\
-F2   &      0.648492 &    0.650097 &       0.648949 &  0.643250 \\
-F0.5 &      0.587619 &    0.585145 &       0.589706 &  0.586983 \\
+F1   &      0.608007 &    0.603050 &       0.628132 &  0.609344 \\
+F2   &      0.636271 &    0.643457 &       0.652385 &  0.640834 \\
+F0.5 &      0.585051 &    0.570976 &       0.608498 &  0.583632 \\
 \end{tabular}
+
 \label{table:f-score-smote}
 \end{table}
 
